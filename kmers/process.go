@@ -14,11 +14,13 @@ func forwardExtract(sequence []byte, results []uint64) {
 	}
 }
 
-func ConvertInSegments(seqChan <-chan []byte, kmerChan chan<- []uint64, size int) {
+func ConvertInSegments(seqChan <-chan *segment, kmerChan chan<- []uint64, size int) {
 
 	for s := range seqChan {
 		kmers := make([]uint64, size)
-		forwardExtract(s, kmers)
+		forwardExtract(s.seq, kmers)
+		s.free = true
 		kmerChan <- kmers
+
 	}
 }
