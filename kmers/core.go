@@ -2,7 +2,7 @@ package kmers
 
 import "encoding/binary"
 
-var K = 31                        // the globally utilised size of K that should be used everywhere
+const K = 31                      // the globally utilised size of K that should be used everywhere
 var bFlip [256]byte               // reverse complement lookup table in chunks of 4 bases
 var invK uint32                   // the distance in bits to shift a post-rev-comp kmer that isn't the same size as the integer containing it
 var positionFlips [32][256]uint64 // lookup table to create the bit-flip positions

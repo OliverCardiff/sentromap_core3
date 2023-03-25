@@ -19,7 +19,7 @@ func ConvertInSegments(seqChan <-chan *segment, kmerChan chan<- []uint64, size i
 	for s := range seqChan {
 		kmers := make([]uint64, size)
 		forwardExtract(s.seq, kmers)
-		s.free = true
+		s.freeIt()
 		kmerChan <- kmers
 
 	}
