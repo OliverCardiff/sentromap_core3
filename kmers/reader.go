@@ -68,7 +68,7 @@ func (s *segmentMemory) nextFree() *segment {
 	return s.slice[s.iter]
 }
 
-func fastaReadRoutine(scanner *bufio.Scanner, divPoints chan []int,
+func fastaReadRoutine(scanner *bufio.Scanner, divPoints chan []int64,
 	segChan chan *segment, fh *os.File) {
 
 	var (
@@ -77,7 +77,7 @@ func fastaReadRoutine(scanner *bufio.Scanner, divPoints chan []int,
 		filled          bool
 		line            []byte
 		divisionCounter int
-		divisions       []int
+		divisions       []int64
 		current         *segment
 		mem             *segmentMemory
 	)
@@ -97,7 +97,7 @@ func fastaReadRoutine(scanner *bufio.Scanner, divPoints chan []int,
 			}
 
 			if divisionCounter != 0 {
-				divisions = append(divisions, divisionCounter)
+				divisions = append(divisions, int64(divisionCounter))
 			}
 
 			continue
@@ -130,14 +130,14 @@ func fastaReadRoutine(scanner *bufio.Scanner, divPoints chan []int,
 	close(segChan)
 }
 
-func ReadFasta(file string) (chan *segment, chan []int, error) {
+func ReadFasta(file string) (chan *segment, chan []int64, error) {
 
 	fh, err := os.Open(file)
 	if err != nil {
 		return nil, nil, err
 	}
 	ch := make(chan *segment)
-	divPoints := make(chan []int)
+	divPoints := make(chan []int64)
 	scanner := bufio.NewScanner(fh)
 
 	go fastaReadRoutine(scanner, divPoints, ch, fh)
