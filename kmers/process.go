@@ -3,6 +3,8 @@ package kmers
 import (
 	"os"
 	"sync"
+
+	"github.com/OliverCardiff/sentromap_core3/progress"
 )
 
 type postionKmers struct {
@@ -61,7 +63,10 @@ func initialConversion(genomeFile, tmpFolder string, threads int) ([]int64, *KSC
 	}
 
 	wg2.Add(1)
-	go ks.channelChunks(kChan, &wg2)
+	pb := progress.NewProgCount("1. conversion (seq)")
+	pb.Run()
+	go ks.channelChunks(kChan, pb, &wg2)
+	defer pb.Stop()
 
 	wg1.Wait()
 	close(kChan)
@@ -91,6 +96,6 @@ func GenomeToKset(genomeFile, ksetFile, tmpFolder string, threads int) error {
 	if err != nil {
 		return err
 	}
-	return nil
-	//return os.RemoveAll(tmpFolder)
+
+	return os.RemoveAll(tmpFolder)
 }

@@ -2,6 +2,7 @@ package kmers
 
 import (
 	"encoding/gob"
+	"fmt"
 	"io"
 	"os"
 )
@@ -61,6 +62,7 @@ func LoadKsetFrom(file string) (*Kset, error) {
 
 func (k *Kset) saveHeader(divs []int64) error {
 
+	k.divs = divs
 	fh, err := os.Create(k.header)
 	if err != nil {
 		return err
@@ -82,6 +84,24 @@ func (k *Kset) saveHeader(divs []int64) error {
 	}
 
 	return nil
+}
+
+func (k *Kset) reportHeaderContent() {
+	mx := len(k.divs)
+	if mx > 10 {
+		mx = 10
+	}
+	if mx == 0 {
+		fmt.Println("\n| No sequence divisions!")
+		return
+	}
+	fmt.Println("\n| Sequence Divisions:")
+	for i := 0; i < mx; i++ {
+		fmt.Printf("| - Chromosome %d-%d: %d\n", i+1, i+2, k.divs[i])
+	}
+
+	fmt.Printf("| ...\n| total divisions: %d\n", len(k.divs))
+
 }
 
 func (k *Kset) openWrite() error {

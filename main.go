@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"runtime"
@@ -59,6 +60,7 @@ func main() {
 			log.Println("You need to supply -i and -o args")
 			tellSubs()
 		}
+		fmt.Print("\n  ~~  SENTROMAP EXTRACTION ROUTINE  ~~  \n\n")
 		err = kmers.GenomeToKset(*fileExtract, *outputExtract, *tmpExtract, *threadsExtract)
 
 	case "trie":

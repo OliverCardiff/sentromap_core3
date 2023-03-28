@@ -52,12 +52,13 @@ func (ks *KSConstructor) closeWrite() error {
 	return err
 }
 
-func (ks *KSConstructor) channelChunks(pkChan <-chan postionKmers, wg *sync.WaitGroup) {
+func (ks *KSConstructor) channelChunks(pkChan <-chan postionKmers, pb *progress.ProgCount, wg *sync.WaitGroup) {
 
 	for kp := range pkChan {
 		for i, v := range kp.kmx {
 			ks.pages[v>>kpShift].add(v, uint64(kp.position+i))
 		}
+		pb.Update(len(kp.kmx))
 	}
 	wg.Done()
 }
@@ -77,7 +78,6 @@ func (ks *KSConstructor) saveKChunk(path string, Ks []uint64, Ps [][]uint64) err
 
 	var (
 		ge1 *gob.Encoder
-		//ge2 *gob.Encoder
 		fh  *os.File
 		err error
 	)
@@ -92,7 +92,6 @@ func (ks *KSConstructor) saveKChunk(path string, Ks []uint64, Ps [][]uint64) err
 	if err != nil {
 		return err
 	}
-	//ge2 = gob.NewEncoder(fh)
 	err = ge1.Encode(&Ps)
 	if err != nil {
 		return err
@@ -175,7 +174,7 @@ func (ks *KSConstructor) sortAndSave(threads int) {
 		close(iChan)
 	}()
 
-	pb := progress.NewProgCount("sort-saving")
+	pb := progress.NewProgCount("2. sort-saving")
 	pb.Run()
 	defer pb.Stop()
 
@@ -226,7 +225,7 @@ func (ks *KSConstructor) reOrgsToKset(ksFile string, divs []int64) error {
 	Karr = make([]uint64, 0, 1e6)
 	Parr = make([][]uint64, 0, 1e6)
 
-	pb := progress.NewProgCount("gathering")
+	pb := progress.NewProgCount("3. gathering")
 	pb.Run()
 	for i := range ks.reorgs {
 		Karr, Parr, err = ks.recoverFromReorg(ks.reorgs[i], Karr, Parr)
@@ -248,6 +247,7 @@ func (ks *KSConstructor) reOrgsToKset(ksFile string, divs []int64) error {
 	if err != nil {
 		return err
 	}
+	kset.reportHeaderContent()
 
 	return nil
 }
