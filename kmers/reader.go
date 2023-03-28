@@ -14,6 +14,15 @@ type segment struct {
 	free  bool
 }
 
+func newSegment(size int) *segment {
+	var s segment
+	s.seq = make([]byte, 0, size)
+	s.free = true
+	s.start = 0
+
+	return &s
+}
+
 func (s *segment) add(seq []byte) ([]byte, bool) {
 
 	if len(s.seq) < SEGPLUS {
@@ -43,14 +52,13 @@ type segmentMemory struct {
 	iter  int
 }
 
-func NewSegmentMemory(count, segSize int) *segmentMemory {
+func newSegmentMemory(count, segSize int) *segmentMemory {
 
 	var s segmentMemory
 
 	s.slice = make([]*segment, count)
 	for i := range s.slice {
-		s.slice[i].seq = make([]byte, 0, segSize)
-		s.slice[i].free = true
+		s.slice[i] = newSegment(segSize)
 	}
 
 	return &s
@@ -65,6 +73,7 @@ func (s *segmentMemory) nextFree() *segment {
 		}
 	}
 
+	s.slice[s.iter].free = false
 	return s.slice[s.iter]
 }
 
@@ -82,7 +91,8 @@ func fastaReadRoutine(scanner *bufio.Scanner, divPoints chan []int64,
 		mem             *segmentMemory
 	)
 
-	mem = NewSegmentMemory(256, SEGPLUS)
+	mem = newSegmentMemory(256, SEGPLUS)
+	current = mem.nextFree()
 
 	for scanner.Scan() {
 		line = scanner.Bytes()
@@ -90,7 +100,7 @@ func fastaReadRoutine(scanner *bufio.Scanner, divPoints chan []int64,
 		if line[0] == '>' {
 
 			if len(current.seq) != 0 {
-				divisionCounter += len(current.seq)
+				divisionCounter += (len(current.seq) - (K - 1))
 				segChan <- current
 				current = mem.nextFree()
 				current.start = divisionCounter
@@ -112,7 +122,6 @@ func fastaReadRoutine(scanner *bufio.Scanner, divPoints chan []int64,
 			segChan <- current
 
 			current = mem.nextFree()
-			divisionCounter += len(line)
 			current.start = int(divisionCounter)
 
 			current.add(hold)
@@ -121,7 +130,6 @@ func fastaReadRoutine(scanner *bufio.Scanner, divPoints chan []int64,
 	}
 
 	if len(current.seq) != 0 {
-		divisionCounter += len(current.seq)
 		segChan <- current
 	}
 
@@ -130,14 +138,14 @@ func fastaReadRoutine(scanner *bufio.Scanner, divPoints chan []int64,
 	close(segChan)
 }
 
-func ReadFasta(file string) (chan *segment, chan []int64, error) {
+func readFasta(file string) (chan *segment, chan []int64, error) {
 
 	fh, err := os.Open(file)
 	if err != nil {
 		return nil, nil, err
 	}
 	ch := make(chan *segment)
-	divPoints := make(chan []int64)
+	divPoints := make(chan []int64, 2)
 	scanner := bufio.NewScanner(fh)
 
 	go fastaReadRoutine(scanner, divPoints, ch, fh)

@@ -36,6 +36,7 @@ func (p *pager) dump() error {
 	if err != nil {
 		return err
 	}
+	//gd = gob.NewEncoder(p.fh)
 	err = gd.Encode(p.memoryP)
 	if err != nil {
 		return err
@@ -83,7 +84,6 @@ func (p *pager) readBackToMidSlice(mid midSlice) (midSlice, error) {
 	var (
 		err error
 		gd1 *gob.Decoder
-		gd2 *gob.Decoder
 		mp  []uint64
 		mk  []uint64
 	)
@@ -100,8 +100,8 @@ func (p *pager) readBackToMidSlice(mid midSlice) (midSlice, error) {
 		if err != nil {
 			break
 		}
-		gd2 = gob.NewDecoder(p.fh)
-		err = gd2.Decode(&mp)
+		//gd2 = gob.NewDecoder(p.fh)
+		err = gd1.Decode(&mp)
 		if err != nil {
 			return nil, err
 		}

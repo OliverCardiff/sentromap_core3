@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+
+	"github.com/OliverCardiff/sentromap_core3/progress"
 )
 
 const PAGEMEM = 10000
@@ -57,6 +59,7 @@ func (ks *KSConstructor) channelChunks(pkChan <-chan postionKmers, wg *sync.Wait
 			ks.pages[v>>kpShift].add(v, uint64(kp.position+i))
 		}
 	}
+	wg.Done()
 }
 
 type midSort struct {
@@ -74,7 +77,7 @@ func (ks *KSConstructor) saveKChunk(path string, Ks []uint64, Ps [][]uint64) err
 
 	var (
 		ge1 *gob.Encoder
-		ge2 *gob.Encoder
+		//ge2 *gob.Encoder
 		fh  *os.File
 		err error
 	)
@@ -89,8 +92,8 @@ func (ks *KSConstructor) saveKChunk(path string, Ks []uint64, Ps [][]uint64) err
 	if err != nil {
 		return err
 	}
-	ge2 = gob.NewEncoder(fh)
-	err = ge2.Encode(&Ps)
+	//ge2 = gob.NewEncoder(fh)
+	err = ge1.Encode(&Ps)
 	if err != nil {
 		return err
 	}
@@ -125,7 +128,7 @@ func (ks *KSConstructor) convertMidToFinal(mids midSlice, Ks []uint64, Ps [][]ui
 	return Ks, Ps
 }
 
-func (ks *KSConstructor) sortSaveWorker(iChan chan int, wg *sync.WaitGroup) {
+func (ks *KSConstructor) sortSaveWorker(iChan chan int, pb *progress.ProgCount, wg *sync.WaitGroup) {
 
 	mids := make(midSlice, 0, 1e6)
 	Ks := make([]uint64, 0, 1e6)
@@ -136,24 +139,26 @@ func (ks *KSConstructor) sortSaveWorker(iChan chan int, wg *sync.WaitGroup) {
 
 		mids, err = ks.pages[i].readBackToMidSlice(mids)
 		if err != nil {
-			log.Println(err.Error())
+			log.Println("readback error: " + err.Error())
 			mids = mids[:0]
 			continue
 		}
 		sort.Sort(mids)
 		Ks, Ps = ks.convertMidToFinal(mids, Ks, Ps)
+		mids = mids[:0]
 		err = ks.saveKChunk(ks.reorgs[i], Ks, Ps)
 		Ks = Ks[:0]
 		Ps = Ps[:0]
 
 		if err != nil {
-			log.Println(err.Error())
+			log.Println("saveKChunk error:" + err.Error())
 			continue
 		}
 		err = ks.pages[i].delete()
 		if err != nil {
-			log.Println(err.Error())
+			log.Println("delete error:" + err.Error())
 		}
+		pb.Update(1)
 	}
 	wg.Done()
 }
@@ -170,15 +175,35 @@ func (ks *KSConstructor) sortAndSave(threads int) {
 		close(iChan)
 	}()
 
+	pb := progress.NewProgCount("sort-saving")
+	pb.Run()
+	defer pb.Stop()
+
 	for i := 0; i < threads; i++ {
 		wg.Add(1)
-		go ks.sortSaveWorker(iChan, &wg)
+		go ks.sortSaveWorker(iChan, pb, &wg)
 	}
 
 	wg.Wait()
 }
 
 func (ks *KSConstructor) recoverFromReorg(file string, Ks []uint64, Ps [][]uint64) ([]uint64, [][]uint64, error) {
+
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer f.Close()
+
+	dec := gob.NewDecoder(f)
+
+	if err := dec.Decode(&Ks); err != nil {
+		return nil, nil, err
+	}
+
+	if err := dec.Decode(&Ps); err != nil {
+		return nil, nil, err
+	}
 
 	return Ks, Ps, nil
 }
@@ -191,7 +216,8 @@ func (ks *KSConstructor) reOrgsToKset(ksFile string, divs []int64) error {
 		Karr []uint64
 		Parr [][]uint64
 	)
-	kset = NewKset(ksFile)
+
+	kset = newKset(ksFile)
 	err = kset.openWrite()
 	if err != nil {
 		return err
@@ -200,6 +226,8 @@ func (ks *KSConstructor) reOrgsToKset(ksFile string, divs []int64) error {
 	Karr = make([]uint64, 0, 1e6)
 	Parr = make([][]uint64, 0, 1e6)
 
+	pb := progress.NewProgCount("gathering")
+	pb.Run()
 	for i := range ks.reorgs {
 		Karr, Parr, err = ks.recoverFromReorg(ks.reorgs[i], Karr, Parr)
 		if err != nil {
@@ -210,7 +238,11 @@ func (ks *KSConstructor) reOrgsToKset(ksFile string, divs []int64) error {
 		if err != nil {
 			return err
 		}
+		Karr = Karr[:0]
+		Parr = Parr[:0]
+		pb.Update(1)
 	}
+	pb.Stop()
 
 	err = kset.saveHeader(divs)
 	if err != nil {

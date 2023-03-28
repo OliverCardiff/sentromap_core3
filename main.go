@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/OliverCardiff/sentromap_core3/kmers"
 	"github.com/OliverCardiff/sentromap_core3/processing"
 )
 
@@ -35,6 +36,7 @@ func main() {
 
 	threadsExtract := extractCmd.Int("t", thrs, "number of extraction threads")
 	fileExtract := extractCmd.String("i", "", "fasta file containing genome of interest")
+	tmpExtract := extractCmd.String("tmp", "tmp", "temporary folder location")
 	outputExtract := extractCmd.String("o", "", "output destination - a new folder will be created here with construction files in it")
 
 	threadsTrie := trieCmd.Int("t", thrs, "number of trie construction threads")
@@ -53,7 +55,12 @@ func main() {
 	switch os.Args[1] {
 	case "extract":
 		extractCmd.Parse(os.Args[2:])
-		err = processing.Extract(*fileExtract, *outputExtract, *threadsExtract)
+		if *fileExtract == "" || *outputExtract == "" {
+			log.Println("You need to supply -i and -o args")
+			tellSubs()
+		}
+		err = kmers.GenomeToKset(*fileExtract, *outputExtract, *tmpExtract, *threadsExtract)
+
 	case "trie":
 		trieCmd.Parse(os.Args[2:])
 		err = processing.Trie(*fileTrie, *outputTrie, *threadsTrie)

@@ -15,7 +15,7 @@ type Kset struct {
 	fh     *os.File
 }
 
-func NewKset(filename string) *Kset {
+func newKset(filename string) *Kset {
 	var k Kset
 	k.file = filename
 	k.header = filename + ".header"

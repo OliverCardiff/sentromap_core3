@@ -1,6 +1,9 @@
 package kmers
 
-import "sync"
+import (
+	"os"
+	"sync"
+)
 
 type postionKmers struct {
 	kmx      []uint64
@@ -12,7 +15,7 @@ func forwardExtract(sequence []byte, results []uint64) {
 
 	var kmer uint64
 	var km1 int = K - 1
-	kmer = canoncial64(kmerAt(sequence[:8]))
+	kmer = canoncial64(kmerAt(sequence[:K]))
 	results[0] = kmer
 
 	for i := K; i < len(sequence)-1; i++ {
@@ -33,24 +36,23 @@ func convertInSegments(seqChan <-chan *segment, kmerChan chan<- postionKmers, wg
 	wg.Done()
 }
 
-func GenomeToKset(genomeFile, ksetFile, tmpFolder string, threads int) error {
-
-	fChan, divs, err := ReadFasta(genomeFile)
+func initialConversion(genomeFile, tmpFolder string, threads int) ([]int64, *KSConstructor, error) {
+	fChan, divs, err := readFasta(genomeFile)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	kChan := make(chan postionKmers, threads)
 
 	ks, err := newKSConstructor(tmpFolder)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	var wg1 sync.WaitGroup
 	var wg2 sync.WaitGroup
 
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	for i := 0; i < threads; i++ {
@@ -66,14 +68,29 @@ func GenomeToKset(genomeFile, ksetFile, tmpFolder string, threads int) error {
 	wg2.Wait()
 	err = ks.closeWrite()
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
-	ks.sortAndSave(threads)
-	err = ks.reOrgsToKset(ksetFile, <-divs)
+	return <-divs, ks, nil
+}
+
+func GenomeToKset(genomeFile, ksetFile, tmpFolder string, threads int) error {
+
+	err := os.MkdirAll(tmpFolder, os.ModePerm)
 	if err != nil {
 		return err
 	}
 
+	divs, ks, err := initialConversion(genomeFile, tmpFolder, threads)
+	if err != nil {
+		return err
+	}
+
+	ks.sortAndSave(threads)
+	err = ks.reOrgsToKset(ksetFile, divs)
+	if err != nil {
+		return err
+	}
 	return nil
+	//return os.RemoveAll(tmpFolder)
 }
